@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Target } from "../../shared/types";
-import { api, RequestError } from "../api";
+import { api, lastDatabase, RequestError } from "../api";
 import { SqlConsole } from "../components/SqlConsole";
 import { TableView } from "../components/TableView";
 import { useAsync } from "../hooks";
@@ -166,7 +166,10 @@ function DatabaseSwitcher({ port, database }: { port: number; database: string }
       Database
       <select
         value={database}
-        onChange={(e) => navigate(`/pg/${port}/${encodeURIComponent(e.target.value)}`)}
+        onChange={(e) => {
+          lastDatabase.set(port, e.target.value);
+          navigate(`/pg/${port}/${encodeURIComponent(e.target.value)}`);
+        }}
       >
         {(options.includes(database) ? options : [database, ...options]).map((name) => (
           <option key={name}>{name}</option>

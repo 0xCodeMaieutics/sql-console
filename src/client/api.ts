@@ -72,3 +72,10 @@ export const api = {
 export function targetKey(target: Target): string {
   return target.engine === "postgres" ? `postgres:${target.port}/${target.database}` : `sqlite:${target.path}`;
 }
+
+const lastDatabaseKey = (port: number) => `sql-console:last-database:${port}`;
+
+export const lastDatabase = {
+  get: (port: number) => localStorage.getItem(lastDatabaseKey(port)) ?? undefined,
+  set: (port: number, database: string) => localStorage.setItem(lastDatabaseKey(port), database),
+};

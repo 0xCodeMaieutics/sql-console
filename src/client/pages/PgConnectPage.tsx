@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { PgLogin } from "../../shared/types";
-import { api } from "../api";
+import { api, lastDatabase } from "../api";
 import { useAsync } from "../hooks";
 
 export function PgConnectPage() {
@@ -13,7 +13,8 @@ export function PgConnectPage() {
   if (info.status === "loading") return <p className="page-message">Loading…</p>;
   if (info.status === "error") return <p className="page-message error">{info.error.message}</p>;
   if (info.data.saved && !editing) {
-    return <Navigate replace to={`/pg/${port}/${encodeURIComponent(info.data.login.database)}`} />;
+    const database = lastDatabase.get(port) ?? info.data.login.database;
+    return <Navigate replace to={`/pg/${port}/${encodeURIComponent(database)}`} />;
   }
   return <LoginForm port={port} initial={info.data.login} saved={info.data.saved} onForgotten={reload} />;
 }
@@ -45,6 +46,7 @@ function LoginForm({
     setError(undefined);
     try {
       const result = await api.saveLogin(port, login);
+      lastDatabase.set(port, result.login.database);
       navigate(`/pg/${port}/${encodeURIComponent(result.login.database)}`);
     } catch (e) {
       setError((e as Error).message);
