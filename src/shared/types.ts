@@ -39,6 +39,13 @@ export type SortDirection = "asc" | "desc";
 
 export type ColumnSort = { column: string; direction: SortDirection };
 
+export const FILTER_OPERATORS = ["=", "!=", ">", ">=", "<", "<=", "in", "contains", "is null", "is not null"] as const;
+
+export type FilterOperator = (typeof FILTER_OPERATORS)[number];
+
+/** One condition on a table page; `in` takes a comma-separated list, the null checks ignore `value`. */
+export type RowFilter = { column: string; operator: FilterOperator; value: string };
+
 export type SourcePosition = { line: number; column: number };
 
 export type StatementResult =

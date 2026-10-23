@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { ColumnSort, TableInfo, Target } from "../../shared/types";
+import type { ColumnSort, RowFilter, TableInfo, Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
 import { ContextMenu } from "../components/ContextMenu";
 import { SqlConsole } from "../components/SqlConsole";
 import { TableView } from "../components/TableView";
 import { useAsync, type AsyncState } from "../hooks";
+
+const NO_FILTERS: RowFilter[] = [];
 
 function useTarget(): Target | undefined {
   const params = useParams();
@@ -48,7 +50,12 @@ function Detail({ target }: { target: Target }) {
   const tableKey = `${schema}.${table}`;
   const [tableSort, setTableSort] = useState<{ tableKey: string; sort: ColumnSort | undefined }>();
   const sort = tableSort?.tableKey === tableKey ? tableSort.sort : undefined;
-  useEffect(() => setTableSort(undefined), [tableKey, consoleOpen]);
+  const [tableFilters, setTableFilters] = useState<{ tableKey: string; filters: RowFilter[] }>();
+  const filters = tableFilters?.tableKey === tableKey ? tableFilters.filters : NO_FILTERS;
+  useEffect(() => {
+    setTableSort(undefined);
+    setTableFilters(undefined);
+  }, [tableKey, consoleOpen]);
 
   const [tables] = useAsync(
     () => (schema ? api.tables(target, schema) : Promise.resolve({ tables: [] })),
@@ -137,6 +144,8 @@ function Detail({ target }: { target: Target }) {
                 table={table}
                 sort={sort}
                 onSortChange={(next) => setTableSort({ tableKey, sort: next })}
+                filters={filters}
+                onFiltersChange={(next) => setTableFilters({ tableKey, filters: next })}
               />
             ) : (
               <p className="empty">Select a table, or open the SQL console.</p>

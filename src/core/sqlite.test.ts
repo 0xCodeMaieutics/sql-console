@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CONSOLE_ROW_LIMIT, TABLE_PAGE_SIZE } from "../shared/types.js";
+import { CONSOLE_ROW_LIMIT, TABLE_PAGE_SIZE, type RowFilter } from "../shared/types.js";
 import { UserError } from "./errors.js";
 import { resolveSqlitePath, SqliteSession } from "./sqlite.js";
 
@@ -133,6 +133,46 @@ describe("SqliteSession", () => {
       session.readTable("main", "users", 0, { column: 'nope"; drop table users; --', direction: "asc" }),
     ).rejects.toThrow(UserError);
     expect((await session.readTable("main", "users", 0)).rows).toHaveLength(TABLE_PAGE_SIZE);
+    session.close();
+  });
+
+  it("filters the whole table with bound values", async () => {
+    const db = new Database(file);
+    db.exec(`update users set name = null where id = 7; update users set name = 'Ann 100%' where id = 1100`);
+    db.close();
+    const session = new SqliteSession(file);
+    const ids = async (filters: RowFilter[], offset = 0) =>
+      (await session.readTable("main", "users", offset, undefined, filters)).rows.map((row) => row[0]);
+    expect(await ids([{ column: "id", operator: "=", value: "42" }])).toEqual([42]);
+    expect(await ids([{ column: "id", operator: "in", value: "3, 1199,,9999" }])).toEqual([3, 1199]);
+    expect(await ids([{ column: "id", operator: ">", value: "1197" }])).toEqual([1198, 1199, 1200]);
+    expect(await ids([{ column: "name", operator: "is null", value: "" }])).toEqual([7]);
+    expect(await ids([{ column: "name", operator: "contains", value: "ann 100%" }])).toEqual([1100]);
+    expect(await ids([{ column: "name", operator: "contains", value: "_" }])).toEqual([]);
+    expect(
+      await ids([
+        { column: "id", operator: ">=", value: "10" },
+        { column: "id", operator: "<", value: "12" },
+      ]),
+    ).toEqual([10, 11]);
+    expect(await ids([{ column: "id", operator: "!=", value: "1" }], 1000)).toHaveLength(199);
+    expect(await ids([{ column: "name", operator: "=", value: "x'); drop table users; --" }])).toEqual([]);
+    expect((await session.readTable("main", "users", 0)).rows).toHaveLength(TABLE_PAGE_SIZE);
+    session.close();
+  });
+
+  it("filters live reads", async () => {
+    const session = new SqliteSession(file);
+    const tail = await session.readTail("main", "users", undefined, [{ column: "id", operator: "<=", value: "5" }]);
+    expect(tail.rows.map((row) => row[0])).toEqual([1, 2, 3, 4, 5]);
+    session.close();
+  });
+
+  it("rejects an in filter without values", async () => {
+    const session = new SqliteSession(file);
+    await expect(
+      session.readTable("main", "users", 0, undefined, [{ column: "id", operator: "in", value: " , " }]),
+    ).rejects.toThrow(UserError);
     session.close();
   });
 

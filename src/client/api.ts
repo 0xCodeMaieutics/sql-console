@@ -3,6 +3,7 @@ import type {
   ColumnSort,
   LoginInfo,
   PgLogin,
+  RowFilter,
   RunResult,
   ScanRange,
   ScanResult,
@@ -49,6 +50,10 @@ function sortQuery(sort: ColumnSort | undefined): Record<string, string> {
   return sort ? { sort: sort.column, direction: sort.direction } : {};
 }
 
+function filtersQuery(filters: RowFilter[]): Record<string, string> {
+  return filters.length > 0 ? { filters: JSON.stringify(filters) } : {};
+}
+
 export const api = {
   settings: () => request<Settings>("/settings"),
   saveScanRange: (scanRange: ScanRange) => request<Settings>("/settings", { method: "PUT", body: { scanRange } }),
@@ -69,12 +74,14 @@ export const api = {
   schemas: (target: Target) => request<{ schemas: string[] }>(`/session/schemas?${targetQuery(target)}`),
   tables: (target: Target, schema: string) =>
     request<{ tables: TableInfo[] }>(`/session/tables?${targetQuery(target, { schema })}`),
-  rows: (target: Target, schema: string, table: string, offset: number, sort?: ColumnSort) =>
+  rows: (target: Target, schema: string, table: string, offset: number, sort?: ColumnSort, filters: RowFilter[] = []) =>
     request<TablePage>(
-      `/session/rows?${targetQuery(target, { schema, table, offset: String(offset), ...sortQuery(sort) })}`,
+      `/session/rows?${targetQuery(target, { schema, table, offset: String(offset), ...sortQuery(sort), ...filtersQuery(filters) })}`,
     ),
-  tail: (target: Target, schema: string, table: string, sort?: ColumnSort) =>
-    request<TableTail>(`/session/rows/tail?${targetQuery(target, { schema, table, ...sortQuery(sort) })}`),
+  tail: (target: Target, schema: string, table: string, sort?: ColumnSort, filters: RowFilter[] = []) =>
+    request<TableTail>(
+      `/session/rows/tail?${targetQuery(target, { schema, table, ...sortQuery(sort), ...filtersQuery(filters) })}`,
+    ),
   truncate: (target: Target, schema: string, table: string) =>
     request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
   run: (target: Target, sql: string) =>

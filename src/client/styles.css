@@ -562,6 +562,33 @@ button.search-clear:hover:not(:disabled) {
   padding: 12px 0;
 }
 
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 2px 2px 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.filter select,
+.filter input {
+  padding: 4px 6px;
+}
+
+.filter input {
+  width: 160px;
+}
+
 /* Grid */
 
 .grid-scroll {
