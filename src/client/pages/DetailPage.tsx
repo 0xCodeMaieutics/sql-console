@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { TableInfo, Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
+import { ContextMenu } from "../components/ContextMenu";
 import { SqlConsole } from "../components/SqlConsole";
 import { TableView } from "../components/TableView";
 import { useAsync, type AsyncState } from "../hooks";
@@ -133,15 +134,16 @@ function Detail({ target }: { target: Target }) {
         </div>
       )}
       {menu && (
-        <TableMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)}>
+        <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)}>
           <button
+            className="danger"
             disabled={menu.table.kind === "view"}
             title={menu.table.kind === "view" ? "Views cannot be truncated" : undefined}
             onClick={() => void truncate(menu.table.name)}
           >
             Truncate table
           </button>
-        </TableMenu>
+        </ContextMenu>
       )}
     </div>
   );
@@ -221,33 +223,6 @@ function TableList({
         <p className="empty small">{filter ? "No matching tables" : "No tables in this schema"}</p>
       )}
     </>
-  );
-}
-
-function TableMenu({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: ReactNode }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("resize", onClose);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", onClose);
-    };
-  }, [onClose]);
-
-  return (
-    <div
-      className="context-menu-backdrop"
-      onClick={onClose}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-    >
-      <div className="context-menu" role="menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
-        {children}
-      </div>
-    </div>
   );
 }
 
