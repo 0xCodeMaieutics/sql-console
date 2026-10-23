@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import type { ApiError, LoginInfo, PgLogin, ScanRange, Settings, Target } from "../shared/types.js";
+import type { ApiError, ColumnSort, LoginInfo, PgLogin, ScanRange, Settings, Target } from "../shared/types.js";
 import { UserError } from "../core/errors.js";
 import { isLoopbackHostname, parsePort } from "../core/loopback.js";
 import { testLogin } from "../core/postgres.js";
@@ -40,6 +40,14 @@ function targetFrom(c: Context): Target {
     return { engine, path: resolveSqlitePath(requireString(c.req.query("path"), "path")) };
   }
   throw new UserError("engine must be postgres or sqlite");
+}
+
+function sortFrom(c: Context): ColumnSort | undefined {
+  const column = c.req.query("sort");
+  if (!column) return undefined;
+  const direction = c.req.query("direction");
+  if (direction !== "asc" && direction !== "desc") throw new UserError("direction must be asc or desc");
+  return { column, direction };
 }
 
 function parseLogin(body: unknown): PgLogin {
@@ -147,13 +155,13 @@ export function createApi(store: Store, sessions = new SessionRegistry(store)) {
     const schema = requireString(c.req.query("schema"), "schema");
     const table = requireString(c.req.query("table"), "table");
     const offset = Math.max(0, Number.parseInt(c.req.query("offset") ?? "0", 10) || 0);
-    return c.json(await sessions.session(targetFrom(c)).readTable(schema, table, offset));
+    return c.json(await sessions.session(targetFrom(c)).readTable(schema, table, offset, sortFrom(c)));
   });
 
   api.get("/session/rows/tail", async (c) => {
     const schema = requireString(c.req.query("schema"), "schema");
     const table = requireString(c.req.query("table"), "table");
-    return c.json(await sessions.session(targetFrom(c)).readTail(schema, table));
+    return c.json(await sessions.session(targetFrom(c)).readTail(schema, table, sortFrom(c)));
   });
 
   api.post("/session/truncate", async (c) => {

@@ -88,6 +88,54 @@ describe("SqliteSession", () => {
     session.close();
   });
 
+  it("sorts the whole table by a column with NULLs last in both directions", async () => {
+    const db = new Database(file);
+    db.exec(`update users set name = null where id in (3, 700)`);
+    db.close();
+    const session = new SqliteSession(file);
+    const asc = await session.readTable("main", "users", 0, { column: "name", direction: "asc" });
+    expect(asc.rows[0][1]).toBe("user 1");
+    expect(asc.rows[1][1]).toBe("user 10");
+    const desc = await session.readTable("main", "users", 0, { column: "name", direction: "desc" });
+    expect(desc.rows[0][1]).toBe("user 999");
+    const lastPage = await session.readTable("main", "users", 1000, { column: "name", direction: "desc" });
+    expect(lastPage.rows.slice(-2).map((row) => row[0])).toEqual([3, 700]);
+    session.close();
+  });
+
+  it("breaks ties by primary key so pages neither repeat nor skip rows", async () => {
+    const db = new Database(file);
+    db.exec(`update users set name = case when id % 2 = 0 then 'even' else 'odd' end`);
+    db.close();
+    const session = new SqliteSession(file);
+    const sort = { column: "name", direction: "asc" } as const;
+    const ids = [];
+    for (let offset = 0; offset < 1200; offset += TABLE_PAGE_SIZE) {
+      ids.push(...(await session.readTable("main", "users", offset, sort)).rows.map((row) => row[0]));
+    }
+    expect(new Set(ids).size).toBe(1200);
+    expect(ids.slice(0, 3)).toEqual([2, 4, 6]);
+    session.close();
+  });
+
+  it("reads the first rows in column sort order for live mode", async () => {
+    const session = new SqliteSession(file);
+    const tail = await session.readTail("main", "users", { column: "id", direction: "desc" });
+    expect(tail.rows).toHaveLength(TABLE_PAGE_SIZE);
+    expect(tail.rows[0][0]).toBe(1200);
+    expect(tail.rows.at(-1)?.[0]).toBe(1200 - TABLE_PAGE_SIZE + 1);
+    session.close();
+  });
+
+  it("reports a database error for a column that cannot be sorted", async () => {
+    const session = new SqliteSession(file);
+    await expect(
+      session.readTable("main", "users", 0, { column: 'nope"; drop table users; --', direction: "asc" }),
+    ).rejects.toThrow(UserError);
+    expect((await session.readTable("main", "users", 0)).rows).toHaveLength(TABLE_PAGE_SIZE);
+    session.close();
+  });
+
   it("refuses live reads without a primary key", async () => {
     const session = new SqliteSession(file);
     await expect(session.readTail("main", "user_names")).rejects.toThrow(UserError);

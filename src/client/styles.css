@@ -599,6 +599,28 @@ button.search-clear:hover:not(:disabled) {
   z-index: 1;
 }
 
+.grid button.sort-header {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.grid button.sort-header:hover {
+  color: var(--accent);
+}
+
+.grid button.sort-header:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sort-arrow {
+  color: var(--accent);
+  font-size: 10px;
+}
+
 .grid tbody tr:hover {
   background: var(--panel);
 }

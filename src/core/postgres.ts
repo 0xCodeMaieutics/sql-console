@@ -2,6 +2,7 @@ import postgres from "postgres";
 import {
   CONSOLE_ROW_LIMIT,
   TABLE_PAGE_SIZE,
+  type ColumnSort,
   type PgLogin,
   type RunResult,
   type StatementResult,
@@ -109,12 +110,12 @@ export class PostgresSession implements DatabaseSession {
     });
   }
 
-  readTable(schema: string, table: string, offset: number): Promise<TablePage> {
+  readTable(schema: string, table: string, offset: number, sort?: ColumnSort): Promise<TablePage> {
     return translate(async () => {
       const primaryKey = await this.primaryKey(schema, table);
       const result = await this.browse
         .unsafe(
-          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
+          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey, "asc", sort)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
         )
         .values();
       return {
@@ -127,10 +128,10 @@ export class PostgresSession implements DatabaseSession {
     });
   }
 
-  readTail(schema: string, table: string): Promise<TableTail> {
+  readTail(schema: string, table: string, sort?: ColumnSort): Promise<TableTail> {
     return translate(async () => {
       const primaryKey = await this.primaryKey(schema, table);
-      const result = await this.browse.unsafe(tailSql(schema, table, primaryKey, TABLE_PAGE_SIZE)).values();
+      const result = await this.browse.unsafe(tailSql(schema, table, primaryKey, TABLE_PAGE_SIZE, sort)).values();
       return { columns: result.columns.map((column) => column.name), rows: result.map(toRow) };
     });
   }
