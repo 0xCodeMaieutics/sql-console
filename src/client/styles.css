@@ -521,6 +521,13 @@ button.search-clear:hover:not(:disabled) {
 .table-view {
   display: flex;
   flex-direction: column;
+  height: 100%;
+}
+
+.table-view .grid-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
 }
 
 .live-toggle {
