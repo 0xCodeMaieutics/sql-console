@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { Target } from "../../shared/types";
+import type { TableInfo, Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
 import { SqlConsole } from "../components/SqlConsole";
 import { TableView } from "../components/TableView";
-import { useAsync } from "../hooks";
+import { useAsync, type AsyncState } from "../hooks";
 
 function useTarget(): Target | undefined {
   const params = useParams();
@@ -40,7 +40,6 @@ function Detail({ target }: { target: Target }) {
         : schemaList[0];
   const table = searchParams.get("table") ?? undefined;
   const consoleOpen = searchParams.get("view") === "console";
-  const filter = searchParams.get("search") ?? "";
 
   const [tables] = useAsync(
     () => (schema ? api.tables(target, schema) : Promise.resolve({ tables: [] })),
@@ -55,10 +54,6 @@ function Detail({ target }: { target: Target }) {
     }
     setSearchParams(params, options);
   };
-
-  const visibleTables = (tables.data?.tables ?? []).filter((t) =>
-    t.name.toLowerCase().includes(filter.trim().toLowerCase()),
-  );
 
   return (
     <div className="detail">
@@ -99,41 +94,11 @@ function Detail({ target }: { target: Target }) {
       ) : (
         <div className="detail-body">
           <aside className="sidebar">
-            <div className="search">
-              <input
-                placeholder="Search tables…"
-                value={filter}
-                onChange={(e) => setParams({ search: e.target.value || undefined }, { replace: true })}
-              />
-              {filter && (
-                <button
-                  className="icon search-clear"
-                  aria-label="Clear search"
-                  title="Clear search"
-                  onClick={() => setParams({ search: undefined }, { replace: true })}
-                >
-                  ×
-                </button>
-              )}
-            </div>
-            {tables.status === "error" && <p className="error">{tables.error.message}</p>}
-            <ul className="table-list">
-              {visibleTables.map((t) => (
-                <li key={t.name}>
-                  <button
-                    className={t.name === table && !consoleOpen ? "selected" : ""}
-                    onClick={() => setParams({ table: t.name, view: undefined })}
-                    title={t.name}
-                  >
-                    <span className="table-name">{t.name}</span>
-                    {t.kind === "view" && <span className="tag">view</span>}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {tables.status === "ready" && visibleTables.length === 0 && (
-              <p className="empty small">{filter ? "No matching tables" : "No tables in this schema"}</p>
-            )}
+            <TableList
+              tables={tables}
+              selected={consoleOpen ? undefined : table}
+              onSelect={(name) => setParams({ table: name, view: undefined })}
+            />
           </aside>
           <main className="main">
             {consoleOpen ? (
@@ -147,6 +112,73 @@ function Detail({ target }: { target: Target }) {
         </div>
       )}
     </div>
+  );
+}
+
+function TableList({
+  tables,
+  selected,
+  onSelect,
+}: {
+  tables: AsyncState<{ tables: TableInfo[] }>;
+  selected: string | undefined;
+  onSelect: (name: string) => void;
+}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [filter, setFilter] = useState(() => searchParams.get("search") ?? "");
+  const syncTimer = useRef<number>(undefined);
+
+  useEffect(() => () => window.clearTimeout(syncTimer.current), []);
+
+  const changeFilter = (value: string, delay = 300) => {
+    setFilter(value);
+    window.clearTimeout(syncTimer.current);
+    syncTimer.current = window.setTimeout(() => {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          if (value) params.set("search", value);
+          else params.delete("search");
+          return params;
+        },
+        { replace: true },
+      );
+    }, delay);
+  };
+
+  const needle = filter.trim().toLowerCase();
+  const visibleTables = (tables.data?.tables ?? []).filter((t) => t.name.toLowerCase().includes(needle));
+
+  return (
+    <>
+      <div className="search">
+        <input placeholder="Search tables…" value={filter} onChange={(e) => changeFilter(e.target.value)} />
+        {filter && (
+          <button
+            className="icon search-clear"
+            aria-label="Clear search"
+            title="Clear search"
+            onClick={() => changeFilter("", 0)}
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {tables.status === "error" && <p className="error">{tables.error.message}</p>}
+      <ul className="table-list">
+        {visibleTables.map((t) => (
+          <li key={t.name}>
+            <button className={t.name === selected ? "selected" : ""} onClick={() => onSelect(t.name)} title={t.name}>
+              <span className="table-name">{t.name}</span>
+              {t.kind === "view" && <span className="tag">view</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {tables.status === "ready" && visibleTables.length === 0 && (
+        <p className="empty small">{filter ? "No matching tables" : "No tables in this schema"}</p>
+      )}
+    </>
   );
 }
 
