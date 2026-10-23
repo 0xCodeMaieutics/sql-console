@@ -1,3 +1,4 @@
+import type { MouseEvent } from "react";
 import type { Cell } from "../../shared/types";
 
 function CellValue({ value }: { value: Cell }) {
@@ -12,7 +13,19 @@ function titleOf(value: Cell): string | undefined {
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
 
-export function DataGrid({ columns, rows }: { columns: string[]; rows: Cell[][] }) {
+export function cellText(value: Cell): string {
+  return titleOf(value) ?? "NULL";
+}
+
+export function DataGrid({
+  columns,
+  rows,
+  onCellContextMenu,
+}: {
+  columns: string[];
+  rows: Cell[][];
+  onCellContextMenu?: (e: MouseEvent, value: Cell) => void;
+}) {
   if (columns.length === 0) return <p className="empty small">No columns</p>;
   return (
     <div className="grid-scroll">
@@ -30,7 +43,11 @@ export function DataGrid({ columns, rows }: { columns: string[]; rows: Cell[][] 
             <tr key={r}>
               <td className="rownum">{r + 1}</td>
               {row.map((value, c) => (
-                <td key={c} title={titleOf(value)}>
+                <td
+                  key={c}
+                  title={titleOf(value)}
+                  onContextMenu={onCellContextMenu && ((e) => onCellContextMenu(e, value))}
+                >
                   <CellValue value={value} />
                 </td>
               ))}
