@@ -93,6 +93,13 @@ export class SqliteSession implements DatabaseSession {
     });
   }
 
+  /** SQLite has no TRUNCATE; an unqualified DELETE uses its truncate optimisation. */
+  truncateTable(schema: string, table: string): Promise<void> {
+    return translate(() => {
+      this.db.prepare(`delete from ${quoteIdent(schema)}.${quoteIdent(table)}`).run();
+    });
+  }
+
   async run(script: string): Promise<RunResult> {
     const runStarted = performance.now();
     const results: StatementResult[] = [];

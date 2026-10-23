@@ -64,6 +64,13 @@ describe("SqliteSession", () => {
     session.close();
   });
 
+  it("truncates a table", async () => {
+    const session = new SqliteSession(file);
+    await session.truncateTable("main", "users");
+    expect((await session.readTable("main", "users", 0)).rows).toEqual([]);
+    session.close();
+  });
+
   it("returns one result per statement and stops at the first error", async () => {
     const session = new SqliteSession(file);
     const { results } = await session.run(`

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { TableInfo, Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
@@ -41,6 +41,10 @@ function Detail({ target }: { target: Target }) {
   const table = searchParams.get("table") ?? undefined;
   const consoleOpen = searchParams.get("view") === "console";
 
+  const [menu, setMenu] = useState<{ x: number; y: number; table: TableInfo }>();
+  const [menuError, setMenuError] = useState<string>();
+  const [truncations, setTruncations] = useState(0);
+
   const [tables] = useAsync(
     () => (schema ? api.tables(target, schema) : Promise.resolve({ tables: [] })),
     [target, schema],
@@ -53,6 +57,18 @@ function Detail({ target }: { target: Target }) {
       else params.set(key, value);
     }
     setSearchParams(params, options);
+  };
+
+  const truncate = async (name: string) => {
+    setMenu(undefined);
+    if (!schema || !window.confirm(`Delete every row in ${schema}.${name}? This cannot be undone.`)) return;
+    setMenuError(undefined);
+    try {
+      await api.truncate(target, schema, name);
+      setTruncations((n) => n + 1);
+    } catch (e) {
+      setMenuError((e as Error).message);
+    }
   };
 
   return (
@@ -97,19 +113,35 @@ function Detail({ target }: { target: Target }) {
             <TableList
               tables={tables}
               selected={consoleOpen ? undefined : table}
+              error={menuError}
               onSelect={(name) => setParams({ table: name, view: undefined })}
+              onContextMenu={(e, t) => {
+                e.preventDefault();
+                setMenu({ x: e.clientX, y: e.clientY, table: t });
+              }}
             />
           </aside>
           <main className="main">
             {consoleOpen ? (
               <SqlConsole target={target} />
             ) : table && schema ? (
-              <TableView key={`${schema}.${table}`} target={target} schema={schema} table={table} />
+              <TableView key={`${schema}.${table}#${truncations}`} target={target} schema={schema} table={table} />
             ) : (
               <p className="empty">Select a table, or open the SQL console.</p>
             )}
           </main>
         </div>
+      )}
+      {menu && (
+        <TableMenu x={menu.x} y={menu.y} onClose={() => setMenu(undefined)}>
+          <button
+            disabled={menu.table.kind === "view"}
+            title={menu.table.kind === "view" ? "Views cannot be truncated" : undefined}
+            onClick={() => void truncate(menu.table.name)}
+          >
+            Truncate table
+          </button>
+        </TableMenu>
       )}
     </div>
   );
@@ -118,11 +150,15 @@ function Detail({ target }: { target: Target }) {
 function TableList({
   tables,
   selected,
+  error,
   onSelect,
+  onContextMenu,
 }: {
   tables: AsyncState<{ tables: TableInfo[] }>;
   selected: string | undefined;
+  error: string | undefined;
   onSelect: (name: string) => void;
+  onContextMenu: (e: MouseEvent, table: TableInfo) => void;
 }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filter, setFilter] = useState(() => searchParams.get("search") ?? "");
@@ -165,10 +201,16 @@ function TableList({
         )}
       </div>
       {tables.status === "error" && <p className="error">{tables.error.message}</p>}
+      {error && <p className="error">{error}</p>}
       <ul className="table-list">
         {visibleTables.map((t) => (
           <li key={t.name}>
-            <button className={t.name === selected ? "selected" : ""} onClick={() => onSelect(t.name)} title={t.name}>
+            <button
+              className={t.name === selected ? "selected" : ""}
+              onClick={() => onSelect(t.name)}
+              onContextMenu={(e) => onContextMenu(e, t)}
+              title={t.name}
+            >
               <span className="table-name">{t.name}</span>
               {t.kind === "view" && <span className="tag">view</span>}
             </button>
@@ -179,6 +221,33 @@ function TableList({
         <p className="empty small">{filter ? "No matching tables" : "No tables in this schema"}</p>
       )}
     </>
+  );
+}
+
+function TableMenu({ x, y, onClose, children }: { x: number; y: number; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("resize", onClose);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", onClose);
+    };
+  }, [onClose]);
+
+  return (
+    <div
+      className="context-menu-backdrop"
+      onClick={onClose}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+    >
+      <div className="context-menu" role="menu" style={{ left: x, top: y }} onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
   );
 }
 

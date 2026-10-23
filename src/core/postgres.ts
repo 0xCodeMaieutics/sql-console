@@ -124,6 +124,12 @@ export class PostgresSession implements DatabaseSession {
     });
   }
 
+  truncateTable(schema: string, table: string): Promise<void> {
+    return translate(async () => {
+      await this.browse.unsafe(`truncate table ${quoteIdent(schema)}.${quoteIdent(table)}`);
+    });
+  }
+
   async run(script: string): Promise<RunResult> {
     const runStarted = performance.now();
     const results: StatementResult[] = [];
