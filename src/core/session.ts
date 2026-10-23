@@ -5,6 +5,7 @@ export interface DatabaseSession {
   listSchemas(): Promise<string[]>;
   listTables(schema: string): Promise<TableInfo[]>;
   readTable(schema: string, table: string, offset: number): Promise<TablePage>;
+  truncateTable(schema: string, table: string): Promise<void>;
   run(script: string): Promise<RunResult>;
 }
 

@@ -150,6 +150,14 @@ export function createApi(store: Store, sessions = new SessionRegistry(store)) {
     return c.json(await sessions.session(targetFrom(c)).readTable(schema, table, offset));
   });
 
+  api.post("/session/truncate", async (c) => {
+    const body = (await jsonBody(c)) as { schema?: unknown; table?: unknown };
+    const schema = requireString(body.schema, "schema");
+    const table = requireString(body.table, "table");
+    await sessions.session(targetFrom(c)).truncateTable(schema, table);
+    return c.json({ ok: true });
+  });
+
   api.post("/session/run", async (c) => {
     const body = (await jsonBody(c)) as { sql?: unknown };
     if (typeof body.sql !== "string") throw new UserError("Missing sql");

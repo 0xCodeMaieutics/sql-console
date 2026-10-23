@@ -65,6 +65,8 @@ export const api = {
     request<{ tables: TableInfo[] }>(`/session/tables?${targetQuery(target, { schema })}`),
   rows: (target: Target, schema: string, table: string, offset: number) =>
     request<TablePage>(`/session/rows?${targetQuery(target, { schema, table, offset: String(offset) })}`),
+  truncate: (target: Target, schema: string, table: string) =>
+    request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
   run: (target: Target, sql: string) =>
     request<RunResult>(`/session/run?${targetQuery(target)}`, { method: "POST", body: { sql } }),
 };
