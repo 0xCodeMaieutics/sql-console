@@ -393,7 +393,24 @@ a.port-row:hover {
 }
 
 .search {
+  position: relative;
   width: 100%;
+}
+
+.search input {
+  width: 100%;
+  padding-right: 28px;
+}
+
+.search-clear {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
+button.search-clear:hover:not(:disabled) {
+  color: var(--text);
 }
 
 .table-list {

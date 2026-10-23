@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
@@ -27,7 +27,6 @@ export function DetailPage() {
 
 function Detail({ target }: { target: Target }) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [filter, setFilter] = useState("");
   const [schemas] = useAsync(() => api.schemas(target), [target]);
 
   const defaultSchema = target.engine === "postgres" ? "public" : "main";
@@ -41,19 +40,20 @@ function Detail({ target }: { target: Target }) {
         : schemaList[0];
   const table = searchParams.get("table") ?? undefined;
   const consoleOpen = searchParams.get("view") === "console";
+  const filter = searchParams.get("search") ?? "";
 
   const [tables] = useAsync(
     () => (schema ? api.tables(target, schema) : Promise.resolve({ tables: [] })),
     [target, schema],
   );
 
-  const setParams = (next: Record<string, string | undefined>) => {
+  const setParams = (next: Record<string, string | undefined>, options?: { replace?: boolean }) => {
     const params = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(next)) {
       if (value === undefined) params.delete(key);
       else params.set(key, value);
     }
-    setSearchParams(params);
+    setSearchParams(params, options);
   };
 
   const visibleTables = (tables.data?.tables ?? []).filter((t) =>
@@ -99,12 +99,23 @@ function Detail({ target }: { target: Target }) {
       ) : (
         <div className="detail-body">
           <aside className="sidebar">
-            <input
-              className="search"
-              placeholder="Search tables…"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            />
+            <div className="search">
+              <input
+                placeholder="Search tables…"
+                value={filter}
+                onChange={(e) => setParams({ search: e.target.value || undefined }, { replace: true })}
+              />
+              {filter && (
+                <button
+                  className="icon search-clear"
+                  aria-label="Clear search"
+                  title="Clear search"
+                  onClick={() => setParams({ search: undefined }, { replace: true })}
+                >
+                  ×
+                </button>
+              )}
+            </div>
             {tables.status === "error" && <p className="error">{tables.error.message}</p>}
             <ul className="table-list">
               {visibleTables.map((t) => (
