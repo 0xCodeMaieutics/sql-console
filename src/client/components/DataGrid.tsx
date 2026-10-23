@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { useLayoutEffect, useRef, type MouseEvent } from "react";
 import type { Cell } from "../../shared/types";
 
 function CellValue({ value }: { value: Cell }) {
@@ -17,22 +17,44 @@ export function cellText(value: Cell): string {
   return titleOf(value) ?? "NULL";
 }
 
+/** Within this many pixels of the bottom still counts as scrolled to the bottom. */
+const BOTTOM_SLACK = 8;
+
 export function DataGrid({
   columns,
   rows,
   onCellContextMenu,
+  follow = false,
 }: {
   columns: string[];
   rows: Cell[][];
   onCellContextMenu?: (e: MouseEvent, value: Cell) => void;
+  /** Keep the newest (last) rows in view while the user is scrolled to the bottom; hides row numbers. */
+  follow?: boolean;
 }) {
+  const scroller = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const wasFollowing = useRef(follow);
+
+  useLayoutEffect(() => {
+    const element = scroller.current;
+    if (follow && !wasFollowing.current) atBottom.current = true;
+    wasFollowing.current = follow;
+    if (follow && element && atBottom.current) element.scrollTop = element.scrollHeight;
+  }, [rows, follow]);
+
+  const onScroll = () => {
+    const element = scroller.current;
+    if (element) atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_SLACK;
+  };
+
   if (columns.length === 0) return <p className="empty small">No columns</p>;
   return (
-    <div className="grid-scroll">
+    <div className="grid-scroll" ref={scroller} onScroll={onScroll}>
       <table className="grid">
         <thead>
           <tr>
-            <th className="rownum">#</th>
+            {!follow && <th className="rownum">#</th>}
             {columns.map((column, i) => (
               <th key={i}>{column}</th>
             ))}
@@ -41,7 +63,7 @@ export function DataGrid({
         <tbody>
           {rows.map((row, r) => (
             <tr key={r}>
-              <td className="rownum">{r + 1}</td>
+              {!follow && <td className="rownum">{r + 1}</td>}
               {row.map((value, c) => (
                 <td
                   key={c}
