@@ -4,6 +4,7 @@ import {
   TABLE_PAGE_SIZE,
   type ColumnSort,
   type PgLogin,
+  type RowFilter,
   type RunResult,
   type StatementResult,
   type TableInfo,
@@ -12,7 +13,7 @@ import {
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
 import { LOOPBACK_HOST } from "./loopback.js";
-import { commandOf, orderBy, quoteIdent, tailSql, type DatabaseSession } from "./session.js";
+import { commandOf, orderBy, quoteIdent, tailSql, whereClause, type DatabaseSession } from "./session.js";
 import { positionAt, splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -110,12 +111,14 @@ export class PostgresSession implements DatabaseSession {
     });
   }
 
-  readTable(schema: string, table: string, offset: number, sort?: ColumnSort): Promise<TablePage> {
+  readTable(schema: string, table: string, offset: number, sort?: ColumnSort, filters: RowFilter[] = []): Promise<TablePage> {
     return translate(async () => {
       const primaryKey = await this.primaryKey(schema, table);
+      const where = whereClause(filters, (n) => `$${n}`);
       const result = await this.browse
         .unsafe(
-          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey, "asc", sort)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
+          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${where.sql}${orderBy(primaryKey, "asc", sort)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
+          where.params,
         )
         .values();
       return {
@@ -128,10 +131,13 @@ export class PostgresSession implements DatabaseSession {
     });
   }
 
-  readTail(schema: string, table: string, sort?: ColumnSort): Promise<TableTail> {
+  readTail(schema: string, table: string, sort?: ColumnSort, filters: RowFilter[] = []): Promise<TableTail> {
     return translate(async () => {
       const primaryKey = await this.primaryKey(schema, table);
-      const result = await this.browse.unsafe(tailSql(schema, table, primaryKey, TABLE_PAGE_SIZE, sort)).values();
+      const where = whereClause(filters, (n) => `$${n}`);
+      const result = await this.browse
+        .unsafe(tailSql(schema, table, primaryKey, TABLE_PAGE_SIZE, where, sort), where.params)
+        .values();
       return { columns: result.columns.map((column) => column.name), rows: result.map(toRow) };
     });
   }

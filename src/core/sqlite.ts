@@ -5,6 +5,7 @@ import {
   CONSOLE_ROW_LIMIT,
   TABLE_PAGE_SIZE,
   type ColumnSort,
+  type RowFilter,
   type RunResult,
   type StatementResult,
   type TableInfo,
@@ -12,7 +13,7 @@ import {
   type TableTail,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
-import { commandOf, orderBy, quoteIdent, tailSql, type DatabaseSession } from "./session.js";
+import { commandOf, orderBy, quoteIdent, tailSql, whereClause, type DatabaseSession } from "./session.js";
 import { splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -80,15 +81,16 @@ export class SqliteSession implements DatabaseSession {
     });
   }
 
-  readTable(schema: string, table: string, offset: number, sort?: ColumnSort): Promise<TablePage> {
+  readTable(schema: string, table: string, offset: number, sort?: ColumnSort, filters: RowFilter[] = []): Promise<TablePage> {
     return translate(() => {
       const primaryKey = this.primaryKey(schema, table);
+      const where = whereClause(filters, () => "?");
       const statement = this.db
         .prepare(
-          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey, "asc", sort)} limit ? offset ?`,
+          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${where.sql}${orderBy(primaryKey, "asc", sort)} limit ? offset ?`,
         )
         .raw(true);
-      const rows = statement.all(TABLE_PAGE_SIZE + 1, offset) as unknown[][];
+      const rows = statement.all(...where.params, TABLE_PAGE_SIZE + 1, offset) as unknown[][];
       return {
         columns: statement.columns().map((column) => column.name),
         rows: rows.slice(0, TABLE_PAGE_SIZE).map(toRow),
@@ -99,12 +101,13 @@ export class SqliteSession implements DatabaseSession {
     });
   }
 
-  readTail(schema: string, table: string, sort?: ColumnSort): Promise<TableTail> {
+  readTail(schema: string, table: string, sort?: ColumnSort, filters: RowFilter[] = []): Promise<TableTail> {
     return translate(() => {
+      const where = whereClause(filters, () => "?");
       const statement = this.db
-        .prepare(tailSql(schema, table, this.primaryKey(schema, table), TABLE_PAGE_SIZE, sort))
+        .prepare(tailSql(schema, table, this.primaryKey(schema, table), TABLE_PAGE_SIZE, where, sort))
         .raw(true);
-      const rows = statement.all() as unknown[][];
+      const rows = statement.all(...where.params) as unknown[][];
       return { columns: statement.columns().map((column) => column.name), rows: rows.map(toRow) };
     });
   }

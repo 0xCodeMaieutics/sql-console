@@ -1,12 +1,20 @@
-import type { ColumnSort, RunResult, SortDirection, TableInfo, TablePage, TableTail } from "../shared/types.js";
+import type {
+  ColumnSort,
+  RowFilter,
+  RunResult,
+  SortDirection,
+  TableInfo,
+  TablePage,
+  TableTail,
+} from "../shared/types.js";
 import { UserError } from "./errors.js";
 
 /** One active session: a PostgreSQL database on a port, or a SQLite database file. */
 export interface DatabaseSession {
   listSchemas(): Promise<string[]>;
   listTables(schema: string): Promise<TableInfo[]>;
-  readTable(schema: string, table: string, offset: number, sort?: ColumnSort): Promise<TablePage>;
-  readTail(schema: string, table: string, sort?: ColumnSort): Promise<TableTail>;
+  readTable(schema: string, table: string, offset: number, sort?: ColumnSort, filters?: RowFilter[]): Promise<TablePage>;
+  readTail(schema: string, table: string, sort?: ColumnSort, filters?: RowFilter[]): Promise<TableTail>;
   truncateTable(schema: string, table: string): Promise<void>;
   run(script: string): Promise<RunResult>;
 }
@@ -26,15 +34,50 @@ export function orderBy(primaryKey: string[], direction: SortDirection = "asc", 
   return keys.length === 0 ? "" : ` order by ${keys.join(", ")}`;
 }
 
+export type Where = { sql: string; params: string[] };
+
+/** Builds an AND of the row filters with bound values; `placeholder` renders the nth (1-based) parameter. */
+export function whereClause(filters: RowFilter[], placeholder: (n: number) => string): Where {
+  const params: string[] = [];
+  const bind = (value: string) => {
+    params.push(value);
+    return placeholder(params.length);
+  };
+  const conditions = filters.map(({ column, operator, value }) => {
+    const ident = quoteIdent(column);
+    switch (operator) {
+      case "is null":
+      case "is not null":
+        return `${ident} ${operator}`;
+      case "contains":
+        return `lower(cast(${ident} as text)) like ${bind(`%${value.toLowerCase().replace(/[\\%_]/g, "\\$&")}%`)} escape '\\'`;
+      case "in": {
+        const values = value
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item !== "");
+        if (values.length === 0) throw new UserError(`Enter at least one value for ${column} in`);
+        return `${ident} in (${values.map(bind).join(", ")})`;
+      }
+      case "!=":
+        return `${ident} <> ${bind(value)}`;
+      default:
+        return `${ident} ${operator} ${bind(value)}`;
+    }
+  });
+  return { sql: conditions.length === 0 ? "" : ` where ${conditions.join(" and ")}`, params };
+}
+
 export function tailSql(
   schema: string,
   table: string,
   primaryKey: string[],
   limit: number,
+  where: Where,
   sort?: ColumnSort,
 ): string {
   if (primaryKey.length === 0) throw new UserError("Live mode needs a table with a primary key");
-  const from = `${quoteIdent(schema)}.${quoteIdent(table)}`;
+  const from = `${quoteIdent(schema)}.${quoteIdent(table)}${where.sql}`;
   if (sort) return `select * from ${from}${orderBy(primaryKey, "asc", sort)} limit ${limit}`;
   return `select * from (select * from ${from}${orderBy(primaryKey, "desc")} limit ${limit}) as tail${orderBy(primaryKey)}`;
 }

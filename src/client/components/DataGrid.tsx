@@ -30,7 +30,7 @@ export function DataGrid({
 }: {
   columns: string[];
   rows: Cell[][];
-  onCellContextMenu?: (e: MouseEvent, value: Cell) => void;
+  onCellContextMenu?: (e: MouseEvent, column: string, value: Cell) => void;
   /** Keep this edge in view while the user is scrolled to it; hides row numbers. */
   follow?: "top" | "bottom";
   sort?: ColumnSort;
@@ -92,7 +92,7 @@ export function DataGrid({
                 <td
                   key={c}
                   title={titleOf(value)}
-                  onContextMenu={onCellContextMenu && ((e) => onCellContextMenu(e, value))}
+                  onContextMenu={onCellContextMenu && ((e) => onCellContextMenu(e, columns[c], value))}
                 >
                   <CellValue value={value} />
                 </td>
