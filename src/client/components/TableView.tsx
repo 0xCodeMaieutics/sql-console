@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Cell, TableTail, Target } from "../../shared/types";
+import type { Cell, ColumnSort, TableTail, Target } from "../../shared/types";
 import { api } from "../api";
 import { useAsync } from "../hooks";
 import { ContextMenu } from "./ContextMenu";
@@ -7,8 +7,28 @@ import { cellText, DataGrid } from "./DataGrid";
 
 const LIVE_INTERVAL_MS = 2000;
 
-export function TableView({ target, schema, table }: { target: Target; schema: string; table: string }) {
-  const [first, reloadFirst] = useAsync(() => api.rows(target, schema, table, 0), [target, schema, table]);
+function nextSort(current: ColumnSort | undefined, column: string): ColumnSort | undefined {
+  if (current?.column !== column) return { column, direction: "asc" };
+  return current.direction === "asc" ? { column, direction: "desc" } : undefined;
+}
+
+export function TableView({
+  target,
+  schema,
+  table,
+  sort,
+  onSortChange,
+}: {
+  target: Target;
+  schema: string;
+  table: string;
+  sort: ColumnSort | undefined;
+  onSortChange: (sort: ColumnSort | undefined) => void;
+}) {
+  const [first, reloadFirst] = useAsync(
+    () => api.rows(target, schema, table, 0, sort),
+    [target, schema, table, sort],
+  );
   const [more, setMore] = useState<{ rows: Cell[][]; hasMore: boolean }>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string>();
@@ -23,7 +43,7 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
     let timer: ReturnType<typeof setTimeout> | undefined;
     const tick = async () => {
       try {
-        const next = await api.tail(target, schema, table);
+        const next = await api.tail(target, schema, table, sort);
         if (stopped) return;
         setTail({ ...next, fetchedAt: new Date() });
         timer = setTimeout(() => void tick(), LIVE_INTERVAL_MS);
@@ -31,6 +51,7 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
         if (stopped) return;
         setError((e as Error).message);
         setLive(false);
+        if (sort) onSortChange(undefined);
       }
     };
     void tick();
@@ -38,9 +59,16 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
       stopped = true;
       clearTimeout(timer);
     };
-  }, [live, target, schema, table]);
+  }, [live, target, schema, table, sort]);
+
+  useEffect(() => {
+    if (first.status !== "error" || !sort) return;
+    setError(first.error.message);
+    onSortChange(undefined);
+  }, [first]);
 
   if (!first.data) {
+    if (first.status === "error" && sort) return <p className="empty">Loading {table}…</p>;
     if (first.status === "error") return <p className="error">{first.error.message}</p>;
     return <p className="empty">Loading {table}…</p>;
   }
@@ -64,6 +92,12 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
     }
   };
 
+  const changeSort = (column: string) => {
+    setError(undefined);
+    setMore(undefined);
+    onSortChange(nextSort(sort, column));
+  };
+
   const copyData = async (value: Cell) => {
     closeMenu();
     try {
@@ -76,7 +110,7 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
   const loadMore = async () => {
     setLoadingMore(true);
     try {
-      const next = await api.rows(target, schema, table, pagedRows.length);
+      const next = await api.rows(target, schema, table, pagedRows.length, sort);
       setMore({ rows: [...(more?.rows ?? []), ...next.rows], hasMore: next.hasMore });
     } catch (e) {
       setError((e as Error).message);
@@ -103,7 +137,7 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
         </button>
         <span className="muted">
           {showTail
-            ? `Newest ${tail.rows.length.toLocaleString()} row${tail.rows.length === 1 ? "" : "s"} · updated ${tail.fetchedAt.toLocaleTimeString()}`
+            ? `${sort ? "First" : "Newest"} ${tail.rows.length.toLocaleString()} row${tail.rows.length === 1 ? "" : "s"}${sort ? ` by ${sort.column} ${sort.direction}` : ""} · updated ${tail.fetchedAt.toLocaleTimeString()}`
             : live
               ? "Starting live mode…"
               : `${pagedRows.length.toLocaleString()} row${pagedRows.length === 1 ? "" : "s"} loaded${hasMore ? ", more available" : ""}`}
@@ -112,7 +146,9 @@ export function TableView({ target, schema, table }: { target: Target; schema: s
       <DataGrid
         columns={showTail ? tail.columns : page.columns}
         rows={showTail ? tail.rows : pagedRows}
-        follow={live}
+        follow={live ? (sort ? "top" : "bottom") : undefined}
+        sort={sort}
+        onSort={changeSort}
         onCellContextMenu={(e, value) => {
           e.preventDefault();
           setMenu({ x: e.clientX, y: e.clientY, value });

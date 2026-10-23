@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import {
   CONSOLE_ROW_LIMIT,
   TABLE_PAGE_SIZE,
+  type ColumnSort,
   type RunResult,
   type StatementResult,
   type TableInfo,
@@ -79,11 +80,13 @@ export class SqliteSession implements DatabaseSession {
     });
   }
 
-  readTable(schema: string, table: string, offset: number): Promise<TablePage> {
+  readTable(schema: string, table: string, offset: number, sort?: ColumnSort): Promise<TablePage> {
     return translate(() => {
       const primaryKey = this.primaryKey(schema, table);
       const statement = this.db
-        .prepare(`select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey)} limit ? offset ?`)
+        .prepare(
+          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey, "asc", sort)} limit ? offset ?`,
+        )
         .raw(true);
       const rows = statement.all(TABLE_PAGE_SIZE + 1, offset) as unknown[][];
       return {
@@ -96,10 +99,10 @@ export class SqliteSession implements DatabaseSession {
     });
   }
 
-  readTail(schema: string, table: string): Promise<TableTail> {
+  readTail(schema: string, table: string, sort?: ColumnSort): Promise<TableTail> {
     return translate(() => {
       const statement = this.db
-        .prepare(tailSql(schema, table, this.primaryKey(schema, table), TABLE_PAGE_SIZE))
+        .prepare(tailSql(schema, table, this.primaryKey(schema, table), TABLE_PAGE_SIZE, sort))
         .raw(true);
       const rows = statement.all() as unknown[][];
       return { columns: statement.columns().map((column) => column.name), rows: rows.map(toRow) };

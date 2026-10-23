@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  ColumnSort,
   LoginInfo,
   PgLogin,
   RunResult,
@@ -44,6 +45,10 @@ function targetQuery(target: Target, extra: Record<string, string> = {}): string
   return new URLSearchParams({ ...params, ...extra }).toString();
 }
 
+function sortQuery(sort: ColumnSort | undefined): Record<string, string> {
+  return sort ? { sort: sort.column, direction: sort.direction } : {};
+}
+
 export const api = {
   settings: () => request<Settings>("/settings"),
   saveScanRange: (scanRange: ScanRange) => request<Settings>("/settings", { method: "PUT", body: { scanRange } }),
@@ -64,10 +69,12 @@ export const api = {
   schemas: (target: Target) => request<{ schemas: string[] }>(`/session/schemas?${targetQuery(target)}`),
   tables: (target: Target, schema: string) =>
     request<{ tables: TableInfo[] }>(`/session/tables?${targetQuery(target, { schema })}`),
-  rows: (target: Target, schema: string, table: string, offset: number) =>
-    request<TablePage>(`/session/rows?${targetQuery(target, { schema, table, offset: String(offset) })}`),
-  tail: (target: Target, schema: string, table: string) =>
-    request<TableTail>(`/session/rows/tail?${targetQuery(target, { schema, table })}`),
+  rows: (target: Target, schema: string, table: string, offset: number, sort?: ColumnSort) =>
+    request<TablePage>(
+      `/session/rows?${targetQuery(target, { schema, table, offset: String(offset), ...sortQuery(sort) })}`,
+    ),
+  tail: (target: Target, schema: string, table: string, sort?: ColumnSort) =>
+    request<TableTail>(`/session/rows/tail?${targetQuery(target, { schema, table, ...sortQuery(sort) })}`),
   truncate: (target: Target, schema: string, table: string) =>
     request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
   run: (target: Target, sql: string) =>

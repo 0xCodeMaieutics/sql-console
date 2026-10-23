@@ -32,8 +32,12 @@ export type TablePage = {
   primaryKey: string[];
 };
 
-/** The last rows of a table by primary key, in ascending key order. */
+/** The rows live mode shows: without a column sort, the last rows by primary key in ascending key order; with one, the first rows in that order. */
 export type TableTail = { columns: string[]; rows: Cell[][] };
+
+export type SortDirection = "asc" | "desc";
+
+export type ColumnSort = { column: string; direction: SortDirection };
 
 export type SourcePosition = { line: number; column: number };
 

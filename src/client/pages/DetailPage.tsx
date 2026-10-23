@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import type { TableInfo, Target } from "../../shared/types";
+import type { ColumnSort, TableInfo, Target } from "../../shared/types";
 import { api, lastDatabase, RequestError } from "../api";
 import { ContextMenu } from "../components/ContextMenu";
 import { SqlConsole } from "../components/SqlConsole";
@@ -45,6 +45,10 @@ function Detail({ target }: { target: Target }) {
   const [menu, setMenu] = useState<{ x: number; y: number; table: TableInfo }>();
   const [menuError, setMenuError] = useState<string>();
   const [truncations, setTruncations] = useState(0);
+  const tableKey = `${schema}.${table}`;
+  const [tableSort, setTableSort] = useState<{ tableKey: string; sort: ColumnSort | undefined }>();
+  const sort = tableSort?.tableKey === tableKey ? tableSort.sort : undefined;
+  useEffect(() => setTableSort(undefined), [tableKey, consoleOpen]);
 
   const [tables] = useAsync(
     () => (schema ? api.tables(target, schema) : Promise.resolve({ tables: [] })),
@@ -126,7 +130,14 @@ function Detail({ target }: { target: Target }) {
             {consoleOpen ? (
               <SqlConsole target={target} />
             ) : table && schema ? (
-              <TableView key={`${schema}.${table}#${truncations}`} target={target} schema={schema} table={table} />
+              <TableView
+                key={`${tableKey}#${truncations}`}
+                target={target}
+                schema={schema}
+                table={table}
+                sort={sort}
+                onSortChange={(next) => setTableSort({ tableKey, sort: next })}
+              />
             ) : (
               <p className="empty">Select a table, or open the SQL console.</p>
             )}
