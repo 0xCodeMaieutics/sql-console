@@ -28,7 +28,12 @@ export type TablePage = {
   rows: Cell[][];
   offset: number;
   hasMore: boolean;
+  /** Primary key columns in key order; empty for views and tables without one. */
+  primaryKey: string[];
 };
+
+/** The last rows of a table by primary key, in ascending key order. */
+export type TableTail = { columns: string[]; rows: Cell[][] };
 
 export type SourcePosition = { line: number; column: number };
 

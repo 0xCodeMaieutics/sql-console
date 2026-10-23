@@ -8,6 +8,7 @@ import type {
   Settings,
   TableInfo,
   TablePage,
+  TableTail,
   Target,
 } from "../shared/types";
 
@@ -65,6 +66,8 @@ export const api = {
     request<{ tables: TableInfo[] }>(`/session/tables?${targetQuery(target, { schema })}`),
   rows: (target: Target, schema: string, table: string, offset: number) =>
     request<TablePage>(`/session/rows?${targetQuery(target, { schema, table, offset: String(offset) })}`),
+  tail: (target: Target, schema: string, table: string) =>
+    request<TableTail>(`/session/rows/tail?${targetQuery(target, { schema, table })}`),
   truncate: (target: Target, schema: string, table: string) =>
     request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
   run: (target: Target, sql: string) =>

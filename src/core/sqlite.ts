@@ -8,9 +8,10 @@ import {
   type StatementResult,
   type TableInfo,
   type TablePage,
+  type TableTail,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
-import { commandOf, quoteIdent, type DatabaseSession } from "./session.js";
+import { commandOf, orderBy, quoteIdent, tailSql, type DatabaseSession } from "./session.js";
 import { splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -80,8 +81,9 @@ export class SqliteSession implements DatabaseSession {
 
   readTable(schema: string, table: string, offset: number): Promise<TablePage> {
     return translate(() => {
+      const primaryKey = this.primaryKey(schema, table);
       const statement = this.db
-        .prepare(`select * from ${quoteIdent(schema)}.${quoteIdent(table)} limit ? offset ?`)
+        .prepare(`select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey)} limit ? offset ?`)
         .raw(true);
       const rows = statement.all(TABLE_PAGE_SIZE + 1, offset) as unknown[][];
       return {
@@ -89,8 +91,26 @@ export class SqliteSession implements DatabaseSession {
         rows: rows.slice(0, TABLE_PAGE_SIZE).map(toRow),
         offset,
         hasMore: rows.length > TABLE_PAGE_SIZE,
+        primaryKey,
       };
     });
+  }
+
+  readTail(schema: string, table: string): Promise<TableTail> {
+    return translate(() => {
+      const statement = this.db
+        .prepare(tailSql(schema, table, this.primaryKey(schema, table), TABLE_PAGE_SIZE))
+        .raw(true);
+      const rows = statement.all() as unknown[][];
+      return { columns: statement.columns().map((column) => column.name), rows: rows.map(toRow) };
+    });
+  }
+
+  private primaryKey(schema: string, table: string): string[] {
+    const rows = this.db
+      .prepare("select name from pragma_table_info(?, ?) where pk > 0 order by pk")
+      .all(table, schema) as { name: string }[];
+    return rows.map((row) => row.name);
   }
 
   /** SQLite has no TRUNCATE; an unqualified DELETE uses its truncate optimisation. */

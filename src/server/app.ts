@@ -150,6 +150,12 @@ export function createApi(store: Store, sessions = new SessionRegistry(store)) {
     return c.json(await sessions.session(targetFrom(c)).readTable(schema, table, offset));
   });
 
+  api.get("/session/rows/tail", async (c) => {
+    const schema = requireString(c.req.query("schema"), "schema");
+    const table = requireString(c.req.query("table"), "table");
+    return c.json(await sessions.session(targetFrom(c)).readTail(schema, table));
+  });
+
   api.post("/session/truncate", async (c) => {
     const body = (await jsonBody(c)) as { schema?: unknown; table?: unknown };
     const schema = requireString(body.schema, "schema");

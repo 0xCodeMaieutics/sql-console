@@ -64,6 +64,36 @@ describe("SqliteSession", () => {
     session.close();
   });
 
+  it("orders pages by primary key and reports it", async () => {
+    const db = new Database(file);
+    db.exec(`
+      create table events (seq integer, source text, note text, primary key (source, seq));
+      insert into events values (2, 'b', 'b2'), (1, 'b', 'b1'), (9, 'a', 'a9');
+    `);
+    db.close();
+    const session = new SqliteSession(file);
+    const page = await session.readTable("main", "events", 0);
+    expect(page.primaryKey).toEqual(["source", "seq"]);
+    expect(page.rows.map((row) => row[2])).toEqual(["a9", "b1", "b2"]);
+    expect((await session.readTable("main", "user_names", 0)).primaryKey).toEqual([]);
+    session.close();
+  });
+
+  it("reads the newest rows by primary key, oldest first", async () => {
+    const session = new SqliteSession(file);
+    const tail = await session.readTail("main", "users");
+    expect(tail.rows).toHaveLength(TABLE_PAGE_SIZE);
+    expect(tail.rows[0][0]).toBe(1200 - TABLE_PAGE_SIZE + 1);
+    expect(tail.rows.at(-1)?.[0]).toBe(1200);
+    session.close();
+  });
+
+  it("refuses live reads without a primary key", async () => {
+    const session = new SqliteSession(file);
+    await expect(session.readTail("main", "user_names")).rejects.toThrow(UserError);
+    session.close();
+  });
+
   it("truncates a table", async () => {
     const session = new SqliteSession(file);
     await session.truncateTable("main", "users");

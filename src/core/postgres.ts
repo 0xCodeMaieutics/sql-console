@@ -7,10 +7,11 @@ import {
   type StatementResult,
   type TableInfo,
   type TablePage,
+  type TableTail,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
 import { LOOPBACK_HOST } from "./loopback.js";
-import { commandOf, quoteIdent, type DatabaseSession } from "./session.js";
+import { commandOf, orderBy, quoteIdent, tailSql, type DatabaseSession } from "./session.js";
 import { positionAt, splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -110,9 +111,10 @@ export class PostgresSession implements DatabaseSession {
 
   readTable(schema: string, table: string, offset: number): Promise<TablePage> {
     return translate(async () => {
+      const primaryKey = await this.primaryKey(schema, table);
       const result = await this.browse
         .unsafe(
-          `select * from ${quoteIdent(schema)}.${quoteIdent(table)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
+          `select * from ${quoteIdent(schema)}.${quoteIdent(table)}${orderBy(primaryKey)} limit ${TABLE_PAGE_SIZE + 1} offset ${offset}`,
         )
         .values();
       return {
@@ -120,8 +122,26 @@ export class PostgresSession implements DatabaseSession {
         rows: result.slice(0, TABLE_PAGE_SIZE).map(toRow),
         offset,
         hasMore: result.length > TABLE_PAGE_SIZE,
+        primaryKey,
       };
     });
+  }
+
+  readTail(schema: string, table: string): Promise<TableTail> {
+    return translate(async () => {
+      const primaryKey = await this.primaryKey(schema, table);
+      const result = await this.browse.unsafe(tailSql(schema, table, primaryKey, TABLE_PAGE_SIZE)).values();
+      return { columns: result.columns.map((column) => column.name), rows: result.map(toRow) };
+    });
+  }
+
+  private async primaryKey(schema: string, table: string): Promise<string[]> {
+    const rows = await this.browse<{ attname: string }[]>`
+      select a.attname from pg_index i
+      join pg_attribute a on a.attrelid = i.indrelid and a.attnum = any(i.indkey)
+      where i.indrelid = to_regclass(format('%I.%I', ${schema}::text, ${table}::text)) and i.indisprimary
+      order by array_position(i.indkey::int2[], a.attnum)`;
+    return rows.map((row) => row.attname);
   }
 
   truncateTable(schema: string, table: string): Promise<void> {

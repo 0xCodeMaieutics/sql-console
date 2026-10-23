@@ -523,6 +523,34 @@ button.search-clear:hover:not(:disabled) {
   flex-direction: column;
 }
 
+.live-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.live-toggle.on {
+  background: var(--green);
+}
+
+.live-toggle.on .live-dot {
+  background: white;
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
 .load-more {
   padding: 12px 0;
 }

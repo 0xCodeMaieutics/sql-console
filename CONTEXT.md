@@ -97,8 +97,12 @@ The SQL console may run any statement the database role permits, with no applica
 _Avoid_: Safe mode, read-only console
 
 **Table page**:
-The read-only rows shown when a table is opened in the main view: up to 500 at a time, with load more fetching the next 500. Row edits happen only through the SQL console; the only other data change is a table truncation from the table menu.
+The read-only rows shown when a table is opened in the main view: up to 500 at a time, with load more fetching the next 500. Rows are ordered by primary key when the table has one; otherwise they appear in the database's natural order, which is not guaranteed to be stable. Row edits happen only through the SQL console; the only other data change is a table truncation from the table menu.
 _Avoid_: Pagination, infinite scroll, data editor
+
+**Live mode**:
+A toggle on the table page that, while on, re-fetches the last 500 rows by primary key every 2 seconds, newest at the bottom, so rows added elsewhere appear without reopening the table. The view follows the newest rows as long as the user is scrolled to the bottom; scrolling up stops following until they return. Load more is unavailable while it is on. It is off whenever a table page is opened, turns itself off if a re-fetch fails, is unavailable for tables without a primary key and for views, and never writes to the database.
+_Avoid_: Auto-refresh, realtime, sync, watch
 
 **Table menu**:
 The context menu opened by right-clicking a table in the table browser; its only action is table truncation, which is unavailable for views.
