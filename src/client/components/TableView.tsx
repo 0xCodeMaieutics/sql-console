@@ -5,6 +5,7 @@ import { useAsync } from "../hooks";
 import { ContextMenu } from "./ContextMenu";
 import { cellText, DataGrid } from "./DataGrid";
 import { FilterBar } from "./FilterBar";
+import { JsonViewer } from "./JsonViewer";
 
 const LIVE_INTERVAL_MS = 2000;
 
@@ -44,6 +45,7 @@ export function TableView({
   const [error, setError] = useState<string>();
   const [menu, setMenu] = useState<{ x: number; y: number; column: string; value: Cell }>();
   const closeMenu = useCallback(() => setMenu(undefined), []);
+  const [jsonCell, setJsonCell] = useState<{ column: string; value: Cell }>();
   const [live, setLive] = useState(false);
   const [tail, setTail] = useState<TableTail & { fetchedAt: Date }>();
   const [shape, setShape] = useState<{ columns: string[]; primaryKey: string[] }>();
@@ -136,6 +138,11 @@ export function TableView({
     changeFilters([...filters, filterFor(column, value)]);
   };
 
+  const viewJson = (column: string, value: Cell) => {
+    closeMenu();
+    setJsonCell({ column, value });
+  };
+
   const loadMore = async () => {
     setLoadingMore(true);
     try {
@@ -188,8 +195,10 @@ export function TableView({
         <ContextMenu x={menu.x} y={menu.y} onClose={closeMenu}>
           <button onClick={() => void copyData(menu.value)}>Copy data</button>
           <button onClick={() => filterByValue(menu.column, menu.value)}>Filter by this value</button>
+          <button onClick={() => viewJson(menu.column, menu.value)}>View value in JSON viewer</button>
         </ContextMenu>
       )}
+      {jsonCell && <JsonViewer column={jsonCell.column} value={jsonCell.value} onClose={() => setJsonCell(undefined)} />}
       {error && <p className="error">{error}</p>}
       {hasMore && !live && (
         <div className="load-more">
