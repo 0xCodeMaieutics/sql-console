@@ -18,6 +18,10 @@ export type Target =
   | { engine: "postgres"; port: number; database: string }
   | { engine: "sqlite"; path: string };
 
+export function targetKey(target: Target): string {
+  return target.engine === "postgres" ? `postgres:${target.port}/${target.database}` : `sqlite:${target.path}`;
+}
+
 export type TableInfo = { name: string; kind: "table" | "view" };
 
 /** JSON-safe cell value; objects and arrays come from json/array columns. */
@@ -75,11 +79,14 @@ export type StatementResult =
 
 export type RunResult = { results: StatementResult[]; durationMs: number };
 
+export type HistoryEntry = { id: number; sql: string; ranAt: string };
+
 export type ApiError = { error: string; code?: string };
 
 export const TABLE_PAGE_SIZE = 500;
 export const CONSOLE_ROW_LIMIT = 1000;
 export const RECENT_SQLITE_LIMIT = 10;
+export const RUN_HISTORY_LIMIT = 100;
 export const DEFAULT_SCAN_RANGE: ScanRange = { start: 5432, end: 5445 };
 export const DEFAULT_PG_LOGIN: PgLogin = {
   user: "postgres",

@@ -92,6 +92,10 @@ _Avoid_: Output, response
 The SQL text in the console, remembered per active session target (port and database, or SQLite file) across view switches and page reloads.
 _Avoid_: Saved query, snippet
 
+**Run history**:
+The list of past runs in the SQL console, kept separately per active session target (port and database, or SQLite file), each entry holding only the SQL text that was run and when; choosing an entry replaces the console draft with its SQL, asking first when the draft is non-empty and matches no entry in the run history, so unrun SQL is never lost silently; choosing an entry never runs it. Every run that reaches the database is recorded, including runs with failed statements, but not runs with nothing to run; re-running the same SQL as the newest entry only refreshes its time. The 100 newest entries per target are kept, and entries can be removed individually or cleared for the target.
+_Avoid_: History (alone), query log, saved queries
+
 **Unrestricted SQL**:
 The SQL console may run any statement the database role permits, with no application-level read-only mode or destructive-statement prompts in v1.
 _Avoid_: Safe mode, read-only console

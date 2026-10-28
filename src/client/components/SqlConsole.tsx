@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { CONSOLE_ROW_LIMIT, type RunResult, type StatementResult, type Target } from "../../shared/types";
+import {
+  CONSOLE_ROW_LIMIT,
+  type HistoryEntry,
+  type RunResult,
+  type StatementResult,
+  type Target,
+} from "../../shared/types";
 import { api, targetKey } from "../api";
+import { useAsync } from "../hooks";
 import { DataGrid } from "./DataGrid";
+import { RunHistory } from "./RunHistory";
 
 const draftKey = (target: Target) => `sql-console:draft:${targetKey(target)}`;
 
@@ -20,6 +28,10 @@ export function SqlConsole({ target }: { target: Target }) {
     localStorage.setItem(draftKey(target), value);
   };
 
+  const [history, reloadHistory, setHistory] = useAsync(() => api.history(target), [target]);
+  const entries = history.data?.entries ?? [];
+  const [historyError, setHistoryError] = useState<string>();
+
   const execute = async () => {
     if (running || sql.trim() === "") return;
     setRunning(true);
@@ -30,39 +42,64 @@ export function SqlConsole({ target }: { target: Target }) {
       setError((e as Error).message);
     } finally {
       setRunning(false);
+      reloadHistory();
+    }
+  };
+
+  const chooseEntry = (entry: HistoryEntry) => {
+    const unrun = sql.trim() !== "" && !entries.some((e) => e.sql === sql);
+    if (unrun && sql !== entry.sql && !window.confirm("Replace the unrun SQL in the console with this entry?")) return;
+    updateSql(entry.sql);
+  };
+
+  const changeHistory = async (change: Promise<{ entries: HistoryEntry[] }>) => {
+    setHistoryError(undefined);
+    try {
+      setHistory({ status: "ready", data: await change });
+    } catch (e) {
+      setHistoryError((e as Error).message);
     }
   };
 
   return (
-    <div className="console">
-      <textarea
-        className="sql-input mono"
-        value={sql}
-        spellCheck={false}
-        placeholder="select * from …;"
-        onChange={(e) => updateSql(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            void execute();
-          }
-        }}
+    <div className="console-layout">
+      <RunHistory
+        entries={entries}
+        error={historyError ?? (history.status === "error" ? history.error.message : undefined)}
+        onChoose={chooseEntry}
+        onRemove={(entry) => void changeHistory(api.removeHistoryEntry(target, entry.id))}
+        onClear={() => void changeHistory(api.clearHistory(target))}
       />
-      <div className="toolbar">
-        <button onClick={() => void execute()} disabled={running || sql.trim() === ""}>
-          {running ? "Running…" : "Run"}
-        </button>
-        <span className="muted">⌘/Ctrl + Enter</span>
-        {run && (
-          <span className="muted">
-            {run.results.length} statement{run.results.length === 1 ? "" : "s"} · {formatMs(run.durationMs)}
-          </span>
-        )}
-      </div>
-      {error && <p className="error">{error}</p>}
-      {run && run.results.length === 0 && <p className="empty small">Nothing to run.</p>}
-      <div className="results">
-        {run?.results.map((result, i) => <StatementBlock key={i} result={result} />)}
+      <div className="console">
+        <textarea
+          className="sql-input mono"
+          value={sql}
+          spellCheck={false}
+          placeholder="select * from …;"
+          onChange={(e) => updateSql(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              void execute();
+            }
+          }}
+        />
+        <div className="toolbar">
+          <button onClick={() => void execute()} disabled={running || sql.trim() === ""}>
+            {running ? "Running…" : "Run"}
+          </button>
+          <span className="muted">⌘/Ctrl + Enter</span>
+          {run && (
+            <span className="muted">
+              {run.results.length} statement{run.results.length === 1 ? "" : "s"} · {formatMs(run.durationMs)}
+            </span>
+          )}
+        </div>
+        {error && <p className="error">{error}</p>}
+        {run && run.results.length === 0 && <p className="empty small">Nothing to run.</p>}
+        <div className="results">
+          {run?.results.map((result, i) => <StatementBlock key={i} result={result} />)}
+        </div>
       </div>
     </div>
   );

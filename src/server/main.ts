@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { LOOPBACK_HOST } from "../core/loopback.js";
+import { RunHistory } from "../core/history.js";
 import { Store } from "../core/store.js";
 import { createApi } from "./app.js";
 
@@ -22,7 +23,8 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const store = new Store();
-const { api, sessions } = createApi(store);
+const history = new RunHistory();
+const { api, sessions } = createApi(store, history);
 const app = new Hono();
 app.route("/api", api);
 
@@ -44,6 +46,7 @@ const server = serve({ fetch: app.fetch, hostname: LOOPBACK_HOST, port }, (info)
 const shutdown = async () => {
   server.close();
   await sessions.closeAll();
+  history.close();
   process.exit(0);
 };
 process.on("SIGINT", shutdown);
