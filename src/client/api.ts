@@ -1,6 +1,7 @@
 import type {
   ApiError,
   ColumnSort,
+  HistoryEntry,
   LoginInfo,
   PgLogin,
   RowFilter,
@@ -86,11 +87,14 @@ export const api = {
     request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
   run: (target: Target, sql: string) =>
     request<RunResult>(`/session/run?${targetQuery(target)}`, { method: "POST", body: { sql } }),
+  history: (target: Target) => request<{ entries: HistoryEntry[] }>(`/session/history?${targetQuery(target)}`),
+  removeHistoryEntry: (target: Target, id: number) =>
+    request<{ entries: HistoryEntry[] }>(`/session/history/${id}?${targetQuery(target)}`, { method: "DELETE" }),
+  clearHistory: (target: Target) =>
+    request<{ entries: HistoryEntry[] }>(`/session/history?${targetQuery(target)}`, { method: "DELETE" }),
 };
 
-export function targetKey(target: Target): string {
-  return target.engine === "postgres" ? `postgres:${target.port}/${target.database}` : `sqlite:${target.path}`;
-}
+export { targetKey } from "../shared/types";
 
 const lastDatabaseKey = (port: number) => `sql-console:last-database:${port}`;
 

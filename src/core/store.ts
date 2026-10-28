@@ -17,9 +17,12 @@ type Config = {
 
 const MAX_SCAN_SIZE = 1000;
 
+export function consoleHome(): string {
+  return process.env.SQL_CONSOLE_HOME ?? path.join(os.homedir(), ".sql-console");
+}
+
 export function defaultConfigPath(): string {
-  const home = process.env.SQL_CONSOLE_HOME ?? path.join(os.homedir(), ".sql-console");
-  return path.join(home, "config.json");
+  return path.join(consoleHome(), "config.json");
 }
 
 /** Local JSON config. Passwords are stored in plain text, so the file is written owner-only. */

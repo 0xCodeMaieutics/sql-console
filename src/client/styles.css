@@ -722,10 +722,118 @@ button.search-clear:hover:not(:disabled) {
 
 /* Console */
 
+.console-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
 .console {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.history {
+  position: sticky;
+  top: 0;
+  width: 240px;
+  flex: none;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.history-header strong {
+  flex: 1;
+  font-size: 13px;
+}
+
+.history-header .link {
+  font-size: 12px;
+}
+
+.history-toggle,
+.history-expand {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.history-expand {
+  position: sticky;
+  top: 0;
+  flex: none;
+}
+
+.history-error {
+  margin: 8px 10px 0;
+  font-size: 12px;
+}
+
+.history-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.history-list li {
+  position: relative;
+}
+
+.history-entry {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  padding: 7px 24px 7px 8px;
+}
+
+.history-entry:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+
+.history-sql {
+  font-family: var(--mono);
+  font-size: 12px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
+.history-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.history-remove {
+  position: absolute;
+  top: 6px;
+  right: 2px;
+  visibility: hidden;
+}
+
+.history-list li:hover .history-remove {
+  visibility: visible;
 }
 
 .sql-input {

@@ -13,6 +13,7 @@ import {
   type Target,
 } from "../shared/types.js";
 import { UserError } from "../core/errors.js";
+import type { RunHistory } from "../core/history.js";
 import { isLoopbackHostname, parsePort } from "../core/loopback.js";
 import { testLogin } from "../core/postgres.js";
 import { SessionRegistry } from "../core/registry.js";
@@ -98,7 +99,7 @@ async function jsonBody(c: Context): Promise<unknown> {
   return c.req.json();
 }
 
-export function createApi(store: Store, sessions = new SessionRegistry(store)) {
+export function createApi(store: Store, history: RunHistory, sessions = new SessionRegistry(store)) {
   const api = new Hono();
 
   // Reject requests that did not originate from a loopback page (DNS rebinding, cross-site POSTs).
@@ -209,7 +210,26 @@ export function createApi(store: Store, sessions = new SessionRegistry(store)) {
   api.post("/session/run", async (c) => {
     const body = (await jsonBody(c)) as { sql?: unknown };
     if (typeof body.sql !== "string") throw new UserError("Missing sql");
-    return c.json(await sessions.session(targetFrom(c)).run(body.sql));
+    const target = targetFrom(c);
+    const result = await sessions.session(target).run(body.sql);
+    if (result.results.length > 0) history.record(target, body.sql);
+    return c.json(result);
+  });
+
+  api.get("/session/history", (c) => c.json({ entries: history.list(targetFrom(c)) }));
+
+  api.delete("/session/history", (c) => {
+    const target = targetFrom(c);
+    history.clear(target);
+    return c.json({ entries: history.list(target) });
+  });
+
+  api.delete("/session/history/:id", (c) => {
+    const target = targetFrom(c);
+    const id = Number(c.req.param("id"));
+    if (!Number.isInteger(id)) throw new UserError("History entry id must be an integer");
+    history.remove(target, id);
+    return c.json({ entries: history.list(target) });
   });
 
   return { api, sessions };
