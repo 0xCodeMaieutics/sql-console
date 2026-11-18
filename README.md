@@ -16,6 +16,34 @@ Pick a schema and a table to see its rows. You can sort by column and add filter
 
 ![Table view of a SQLite database](docs/screenshots/table.png)
 
+### Cell menu
+
+Right-click any cell in a table to open its menu. Press Esc or click elsewhere to close it.
+
+![Cell menu open on a table cell](docs/screenshots/cell-menu.png)
+
+#### Set value
+
+Edit the cell in place. Press Enter or **Save** to write the new value, **NULL** to clear it, and Esc or **Cancel** to discard your change. This option is disabled for tables without a primary key.
+
+![Inline cell editor with Save, NULL, and Cancel buttons](docs/screenshots/cell-set-value.png)
+
+#### Copy data
+
+Copy the cell's value to the clipboard as text. A `NULL` cell copies as the word `NULL`.
+
+#### Filter by this value
+
+Add a filter that matches the cell's value, on top of any filters already applied. A `NULL` cell adds an `is null` filter.
+
+![Table filtered to rows where country equals UK](docs/screenshots/cell-filter.png)
+
+#### View value in JSON viewer
+
+Open the value as formatted JSON, with a **Copy JSON** button. If the value is not valid JSON, the viewer shows the parse error instead. Press Esc, **Close**, or click outside the viewer to dismiss it.
+
+![JSON viewer showing a formatted prefs value](docs/screenshots/cell-json-viewer.png)
+
 ### SQL console
 
 Run raw SQL with ⌘/Ctrl + Enter. Each run is saved to a history panel, so you can bring earlier queries back.
