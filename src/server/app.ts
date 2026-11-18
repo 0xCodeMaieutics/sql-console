@@ -3,6 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import {
   FILTER_OPERATORS,
   type ApiError,
+  type CellUpdate,
   type ColumnSort,
   type FilterOperator,
   type LoginInfo,
@@ -11,6 +12,7 @@ import {
   type ScanRange,
   type Settings,
   type Target,
+  type UpdatedRow,
 } from "../shared/types.js";
 import { UserError } from "../core/errors.js";
 import type { RunHistory } from "../core/history.js";
@@ -205,6 +207,23 @@ export function createApi(store: Store, history: RunHistory, sessions = new Sess
     const table = requireString(body.table, "table");
     await sessions.session(targetFrom(c)).truncateTable(schema, table);
     return c.json({ ok: true });
+  });
+
+  api.post("/session/cell", async (c) => {
+    const body = (await jsonBody(c)) as Record<string, unknown>;
+    const key = body.key;
+    if (typeof key !== "object" || key === null || Object.values(key).some((v) => typeof v !== "string")) {
+      throw new UserError("key must map primary key columns to text values");
+    }
+    if (body.value !== null && typeof body.value !== "string") throw new UserError("value must be text or null");
+    const update: CellUpdate = {
+      schema: requireString(body.schema, "schema"),
+      table: requireString(body.table, "table"),
+      key: key as Record<string, string>,
+      column: requireString(body.column, "column"),
+      value: body.value,
+    };
+    return c.json<UpdatedRow>(await sessions.session(targetFrom(c)).updateCell(update));
   });
 
   api.post("/session/run", async (c) => {

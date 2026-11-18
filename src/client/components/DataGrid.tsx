@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, type MouseEvent } from "react";
+import { useLayoutEffect, useRef, type MouseEvent, type ReactNode } from "react";
 import type { Cell, ColumnSort } from "../../shared/types";
 
 function CellValue({ value }: { value: Cell }) {
@@ -27,15 +27,21 @@ export function DataGrid({
   follow,
   sort,
   onSort,
+  rowKey,
+  editing,
 }: {
   columns: string[];
   rows: Cell[][];
-  onCellContextMenu?: (e: MouseEvent, column: string, value: Cell) => void;
+  onCellContextMenu?: (e: MouseEvent, column: string, value: Cell, row: Cell[]) => void;
   /** Keep this edge in view while the user is scrolled to it; hides row numbers. */
   follow?: "top" | "bottom";
   sort?: ColumnSort;
   /** Makes column headers clickable. */
   onSort?: (column: string) => void;
+  /** Identifies rows across re-fetches; defaults to their position. */
+  rowKey?: (row: Cell[]) => string;
+  /** Renders `editor` in place of the value of this cell; needs `rowKey`. */
+  editing?: { rowKey: string; column: string; editor: ReactNode };
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const atEdge = useRef(true);
@@ -85,20 +91,29 @@ export function DataGrid({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, r) => (
-            <tr key={r}>
-              {!follow && <td className="rownum">{r + 1}</td>}
-              {row.map((value, c) => (
-                <td
-                  key={c}
-                  title={titleOf(value)}
-                  onContextMenu={onCellContextMenu && ((e) => onCellContextMenu(e, columns[c], value))}
-                >
-                  <CellValue value={value} />
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row, r) => {
+            const key = rowKey?.(row);
+            return (
+              <tr key={key ?? r}>
+                {!follow && <td className="rownum">{r + 1}</td>}
+                {row.map((value, c) =>
+                  editing && key === editing.rowKey && columns[c] === editing.column ? (
+                    <td key={c} className="editing">
+                      {editing.editor}
+                    </td>
+                  ) : (
+                    <td
+                      key={c}
+                      title={titleOf(value)}
+                      onContextMenu={onCellContextMenu && ((e) => onCellContextMenu(e, columns[c], value, row))}
+                    >
+                      <CellValue value={value} />
+                    </td>
+                  ),
+                )}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {rows.length === 0 && <p className="empty small">No rows</p>}

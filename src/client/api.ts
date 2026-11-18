@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  CellUpdate,
   ColumnSort,
   HistoryEntry,
   LoginInfo,
@@ -13,6 +14,7 @@ import type {
   TablePage,
   TableTail,
   Target,
+  UpdatedRow,
 } from "../shared/types";
 
 export class RequestError extends Error {
@@ -85,6 +87,8 @@ export const api = {
     ),
   truncate: (target: Target, schema: string, table: string) =>
     request<{ ok: true }>(`/session/truncate?${targetQuery(target)}`, { method: "POST", body: { schema, table } }),
+  updateCell: (target: Target, update: CellUpdate) =>
+    request<UpdatedRow>(`/session/cell?${targetQuery(target)}`, { method: "POST", body: update }),
   run: (target: Target, sql: string) =>
     request<RunResult>(`/session/run?${targetQuery(target)}`, { method: "POST", body: { sql } }),
   history: (target: Target) => request<{ entries: HistoryEntry[] }>(`/session/history?${targetQuery(target)}`),

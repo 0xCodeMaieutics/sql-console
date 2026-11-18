@@ -50,6 +50,18 @@ export type FilterOperator = (typeof FILTER_OPERATORS)[number];
 /** One condition on a table page; `in` takes a comma-separated list, the null checks ignore `value`. */
 export type RowFilter = { column: string; operator: FilterOperator; value: string };
 
+/** Sets one column of the row whose primary key columns hold `key` (as text); the database converts `value` to the column's type. */
+export type CellUpdate = {
+  schema: string;
+  table: string;
+  key: Record<string, string>;
+  column: string;
+  value: string | null;
+};
+
+/** The whole row after a cell update, as the database stored it. */
+export type UpdatedRow = { columns: string[]; row: Cell[] };
+
 export type SourcePosition = { line: number; column: number };
 
 export type StatementResult =

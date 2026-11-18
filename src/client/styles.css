@@ -705,6 +705,50 @@ button.search-clear:hover:not(:disabled) {
   background: var(--panel);
 }
 
+.grid td.editing {
+  max-width: none;
+  overflow: visible;
+  padding: 3px 4px;
+}
+
+.cell-editor-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cell-editor input {
+  min-width: 220px;
+  padding: 3px 6px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.cell-editor button {
+  padding: 3px 8px;
+  font-size: 12px;
+}
+
+.cell-editor-error {
+  margin: 4px 0 0;
+  max-width: 420px;
+  white-space: normal;
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.toast {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 20;
+  padding: 10px 14px;
+  background: var(--panel-2);
+  border: 1px solid var(--green);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
 .grid .rownum {
   color: var(--muted);
   text-align: right;
