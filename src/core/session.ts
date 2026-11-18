@@ -1,4 +1,5 @@
 import type {
+  CellUpdate,
   ColumnSort,
   RowFilter,
   RunResult,
@@ -6,6 +7,7 @@ import type {
   TableInfo,
   TablePage,
   TableTail,
+  UpdatedRow,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
 
@@ -16,6 +18,7 @@ export interface DatabaseSession {
   readTable(schema: string, table: string, offset: number, sort?: ColumnSort, filters?: RowFilter[]): Promise<TablePage>;
   readTail(schema: string, table: string, sort?: ColumnSort, filters?: RowFilter[]): Promise<TableTail>;
   truncateTable(schema: string, table: string): Promise<void>;
+  updateCell(update: CellUpdate): Promise<UpdatedRow>;
   run(script: string): Promise<RunResult>;
 }
 
@@ -66,6 +69,28 @@ export function whereClause(filters: RowFilter[], placeholder: (n: number) => st
     }
   });
   return { sql: conditions.length === 0 ? "" : ` where ${conditions.join(" and ")}`, params };
+}
+
+export const ROW_NOT_FOUND = "No row has this primary key any more; it may have been changed or deleted";
+
+/** Builds an UPDATE of one cell returning the whole row; `param` renders the nth (1-based) bound value for a column. */
+export function updateCellSql(
+  primaryKey: string[],
+  { schema, table, key, column, value }: CellUpdate,
+  param: (n: number, column: string) => string,
+): { sql: string; params: (string | null)[] } {
+  if (primaryKey.length === 0) throw new UserError("Setting a value needs a table with a primary key");
+  const params: (string | null)[] = [value];
+  const conditions = primaryKey.map((name) => {
+    const current = key[name];
+    if (typeof current !== "string") throw new UserError(`Missing primary key value for ${name}`);
+    params.push(current);
+    return `${quoteIdent(name)} = ${param(params.length, name)}`;
+  });
+  return {
+    sql: `update ${quoteIdent(schema)}.${quoteIdent(table)} set ${quoteIdent(column)} = ${param(1, column)} where ${conditions.join(" and ")} returning *`,
+    params,
+  };
 }
 
 export function tailSql(

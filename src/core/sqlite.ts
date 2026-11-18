@@ -4,6 +4,7 @@ import Database from "better-sqlite3";
 import {
   CONSOLE_ROW_LIMIT,
   TABLE_PAGE_SIZE,
+  type CellUpdate,
   type ColumnSort,
   type RowFilter,
   type RunResult,
@@ -11,9 +12,19 @@ import {
   type TableInfo,
   type TablePage,
   type TableTail,
+  type UpdatedRow,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
-import { commandOf, orderBy, quoteIdent, tailSql, whereClause, type DatabaseSession } from "./session.js";
+import {
+  commandOf,
+  orderBy,
+  quoteIdent,
+  ROW_NOT_FOUND,
+  tailSql,
+  updateCellSql,
+  whereClause,
+  type DatabaseSession,
+} from "./session.js";
 import { splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -123,6 +134,16 @@ export class SqliteSession implements DatabaseSession {
   truncateTable(schema: string, table: string): Promise<void> {
     return translate(() => {
       this.db.prepare(`delete from ${quoteIdent(schema)}.${quoteIdent(table)}`).run();
+    });
+  }
+
+  updateCell(update: CellUpdate): Promise<UpdatedRow> {
+    return translate(() => {
+      const { sql, params } = updateCellSql(this.primaryKey(update.schema, update.table), update, () => "?");
+      const statement = this.db.prepare(sql).raw(true);
+      const [row] = statement.all(...params) as unknown[][];
+      if (!row) throw new UserError(ROW_NOT_FOUND, 404);
+      return { columns: statement.columns().map((column) => column.name), row: toRow(row) };
     });
   }
 

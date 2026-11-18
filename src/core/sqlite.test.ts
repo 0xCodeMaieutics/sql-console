@@ -189,6 +189,36 @@ describe("SqliteSession", () => {
     session.close();
   });
 
+  it("sets one cell by primary key and returns the stored row", async () => {
+    const session = new SqliteSession(file);
+    const update = { schema: "main", table: "users", key: { id: "42" }, column: "name", value: "Ann" };
+    expect(await session.updateCell(update)).toEqual({ columns: ["id", "name", "avatar"], row: [42, "Ann", null] });
+    expect((await session.updateCell({ ...update, value: null })).row[1]).toBeNull();
+    const page = await session.readTable("main", "users", 0, undefined, [{ column: "id", operator: "<=", value: "43" }]);
+    expect(page.rows.slice(-2).map((row) => row[1])).toEqual([null, "user 43"]);
+    session.close();
+  });
+
+  it("reports a missing row, a view, and values the database rejects", async () => {
+    const db = new Database(file);
+    db.exec(`create table events (id integer primary key, at text not null check (date(at) is not null)) strict;
+             insert into events values (1, '2026-11-16')`);
+    db.close();
+    const session = new SqliteSession(file);
+    const event = { schema: "main", table: "events", key: { id: "1" }, column: "at" };
+    expect((await session.updateCell({ ...event, value: "2026-12-01" })).row).toEqual([1, "2026-12-01"]);
+    await expect(session.updateCell({ ...event, value: "not a date" })).rejects.toThrow(UserError);
+    await expect(session.updateCell({ ...event, value: null })).rejects.toThrow(UserError);
+    await expect(session.updateCell({ ...event, key: { id: "999" }, value: "2026-12-01" })).rejects.toMatchObject({
+      status: 404,
+    });
+    await expect(
+      session.updateCell({ schema: "main", table: "user_names", key: {}, column: "name", value: "x" }),
+    ).rejects.toThrow("primary key");
+    expect((await session.readTable("main", "events", 0)).rows).toEqual([[1, "2026-12-01"]]);
+    session.close();
+  });
+
   it("returns one result per statement and stops at the first error", async () => {
     const session = new SqliteSession(file);
     const { results } = await session.run(`

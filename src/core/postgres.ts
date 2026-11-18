@@ -2,6 +2,7 @@ import postgres from "postgres";
 import {
   CONSOLE_ROW_LIMIT,
   TABLE_PAGE_SIZE,
+  type CellUpdate,
   type ColumnSort,
   type PgLogin,
   type RowFilter,
@@ -10,10 +11,20 @@ import {
   type TableInfo,
   type TablePage,
   type TableTail,
+  type UpdatedRow,
 } from "../shared/types.js";
 import { UserError } from "./errors.js";
 import { LOOPBACK_HOST } from "./loopback.js";
-import { commandOf, orderBy, quoteIdent, tailSql, whereClause, type DatabaseSession } from "./session.js";
+import {
+  commandOf,
+  orderBy,
+  quoteIdent,
+  ROW_NOT_FOUND,
+  tailSql,
+  updateCellSql,
+  whereClause,
+  type DatabaseSession,
+} from "./session.js";
 import { positionAt, splitSql } from "./split-sql.js";
 import { toRow } from "./values.js";
 
@@ -155,6 +166,29 @@ export class PostgresSession implements DatabaseSession {
     return translate(async () => {
       await this.browse.unsafe(`truncate table ${quoteIdent(schema)}.${quoteIdent(table)}`);
     });
+  }
+
+  /** Binds values as text and casts them, since postgres.js would otherwise serialize strings by the column's type (dates via `new Date`, booleans, JSON). */
+  updateCell(update: CellUpdate): Promise<UpdatedRow> {
+    return translate(async () => {
+      const primaryKey = await this.primaryKey(update.schema, update.table);
+      const types = await this.columnTypes(update.schema, update.table);
+      const { sql, params } = updateCellSql(primaryKey, update, (n, column) =>
+        types.has(column) ? `cast($${n}::text as ${types.get(column)})` : `$${n}`,
+      );
+      const result = await this.browse.unsafe(sql, params).values();
+      if (result.length === 0) throw new UserError(ROW_NOT_FOUND, 404);
+      return { columns: result.columns.map((column) => column.name), row: toRow(result[0]) };
+    });
+  }
+
+  /** Type names without modifiers, so a too-long value fails the column's own check instead of being cut by the cast. */
+  private async columnTypes(schema: string, table: string): Promise<Map<string, string>> {
+    const rows = await this.browse<{ attname: string; type: string }[]>`
+      select a.attname, format_type(a.atttypid, null) as type from pg_attribute a
+      where a.attrelid = to_regclass(format('%I.%I', ${schema}::text, ${table}::text))
+        and a.attnum > 0 and not a.attisdropped`;
+    return new Map(rows.map((row) => [row.attname, row.type]));
   }
 
   async run(script: string): Promise<RunResult> {
